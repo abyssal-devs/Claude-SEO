@@ -9,7 +9,27 @@ Coleção de **skills** e **subagents** para [Claude Code](https://claude.com/cl
 
 ## Instalação
 
-Copie as pastas para o seu diretório do Claude Code (`~/.claude`):
+### Windows (PowerShell) — instalador automático
+
+Roda o instalador direto do GitHub (faz `git clone` e copia para `~/.claude`):
+
+```powershell
+irm https://raw.githubusercontent.com/abyssal-devs/Claude-SEO/main/install.ps1 | iex
+```
+
+Ou, após clonar o repositório:
+
+```powershell
+.\install.ps1
+```
+
+O script detecta Python e Git, clona a branch `main`, instala as skills em
+`~/.claude/skills/`, os subagents em `~/.claude/agents/` e, se Python estiver
+disponível, instala as dependências de `skills/seo/requirements.txt` (e o
+Chromium do Playwright, opcional). Variáveis de override:
+`$env:CLAUDE_SEO_BRANCH` (default `main`) e `$env:CLAUDE_SEO_KEEP_TEMP=1`.
+
+### Instalação manual
 
 ```bash
 cp -r skills/* ~/.claude/skills/
