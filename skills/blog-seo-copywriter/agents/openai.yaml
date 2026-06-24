@@ -1,0 +1,4 @@
+interface:
+  display_name: "Blog SEO Copywriter"
+  short_description: "Gerar posts de blog longos com SEO e busca org�nica."
+  default_prompt: "Crie um post de blog baseado na URL e no tema fornecidos, com foco em SEO."

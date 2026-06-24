@@ -1,0 +1,17 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Runtime / local Claude Code artifacts (never commit)
+.credentials.json
+.last-cleanup
+backups/
+projects/
+sessions/
+session-env/
+shell-snapshots/
+telemetry/
+ide/
