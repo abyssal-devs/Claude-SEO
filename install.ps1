@@ -121,13 +121,20 @@ try {
 }
 
 # Paths -----------------------------------------------------------------------
-$SkillsDir = "$env:USERPROFILE\.claude\skills"
-$AgentDir  = "$env:USERPROFILE\.claude\agents"
-$RepoUrl   = "https://github.com/abyssal-devs/Claude-SEO.git"
-$Branch    = if ($env:CLAUDE_SEO_BRANCH) { $env:CLAUDE_SEO_BRANCH } else { 'main' }
+$ClaudeDir  = "$env:USERPROFILE\.claude"
+$SkillsDir  = "$ClaudeDir\skills"
+$AgentDir   = "$ClaudeDir\agents"
+$ScriptsDir = "$ClaudeDir\scripts"
+$SchemaDir  = "$ClaudeDir\schema"
+$PdfDir     = "$ClaudeDir\pdf"
+$RepoUrl    = "https://github.com/abyssal-devs/Claude-SEO.git"
+$Branch     = if ($env:CLAUDE_SEO_BRANCH) { $env:CLAUDE_SEO_BRANCH } else { 'main' }
 
-New-Item -ItemType Directory -Force -Path $SkillsDir | Out-Null
-New-Item -ItemType Directory -Force -Path $AgentDir  | Out-Null
+New-Item -ItemType Directory -Force -Path $SkillsDir  | Out-Null
+New-Item -ItemType Directory -Force -Path $AgentDir   | Out-Null
+New-Item -ItemType Directory -Force -Path $ScriptsDir | Out-Null
+New-Item -ItemType Directory -Force -Path $SchemaDir  | Out-Null
+New-Item -ItemType Directory -Force -Path $PdfDir     | Out-Null
 
 # Temp clone ------------------------------------------------------------------
 $TempDir = Join-Path $env:TEMP "claude-seo-install"
@@ -157,6 +164,10 @@ try {
         Copy-Item -Recurse -Force "$($_.FullName)\*" $target
         $skillCount++
     }
+    # Copy root-level files inside skills/ (e.g. CLAUDE.md)
+    Get-ChildItem -File $SkillsSource | ForEach-Object {
+        Copy-Item -Force $_.FullName $SkillsDir
+    }
     Write-Host "   $skillCount skill(s) installed." -ForegroundColor Gray
 
     # Install subagents (agents/*.md -> ~/.claude/agents) ---------------------
@@ -166,6 +177,33 @@ try {
         Copy-Item -Force (Join-Path $AgentsSource '*.md') $AgentDir -ErrorAction SilentlyContinue
         $agentCount = (Get-ChildItem -File -Filter '*.md' $AgentsSource | Measure-Object).Count
         Write-Host "   $agentCount subagent(s) installed." -ForegroundColor Gray
+    }
+
+    # Install scripts (scripts/*.py -> ~/.claude/scripts/) --------------------
+    Write-Host "=> Installing scripts..." -ForegroundColor Yellow
+    $ScriptsSource = Join-Path $TempDir 'scripts'
+    if (Test-Path $ScriptsSource) {
+        Copy-Item -Recurse -Force "$ScriptsSource\*" $ScriptsDir
+        $scriptCount = (Get-ChildItem -File $ScriptsSource | Measure-Object).Count
+        Write-Host "   $scriptCount script(s) installed." -ForegroundColor Gray
+    }
+
+    # Install schema (schema/* -> ~/.claude/schema/) --------------------------
+    Write-Host "=> Installing schema templates..." -ForegroundColor Yellow
+    $SchemaSource = Join-Path $TempDir 'schema'
+    if (Test-Path $SchemaSource) {
+        Copy-Item -Recurse -Force "$SchemaSource\*" $SchemaDir
+        $schemaCount = (Get-ChildItem -File $SchemaSource | Measure-Object).Count
+        Write-Host "   $schemaCount schema file(s) installed." -ForegroundColor Gray
+    }
+
+    # Install pdf references (pdf/* -> ~/.claude/pdf/) ------------------------
+    Write-Host "=> Installing PDF references..." -ForegroundColor Yellow
+    $PdfSource = Join-Path $TempDir 'pdf'
+    if (Test-Path $PdfSource) {
+        Copy-Item -Recurse -Force "$PdfSource\*" $PdfDir
+        $pdfCount = (Get-ChildItem -File $PdfSource | Measure-Object).Count
+        Write-Host "   $pdfCount reference file(s) installed." -ForegroundColor Gray
     }
 
     # Install Python dependencies ---------------------------------------------
@@ -215,5 +253,8 @@ Write-Host "Usage:" -ForegroundColor Cyan
 Write-Host "  1. Start Claude Code:  claude"
 Write-Host "  2. Run a skill:        /seo audit https://example.com"
 Write-Host ""
-Write-Host "Skills location: $SkillsDir" -ForegroundColor Gray
-Write-Host "Agents location: $AgentDir" -ForegroundColor Gray
+Write-Host "Skills location:  $SkillsDir" -ForegroundColor Gray
+Write-Host "Agents location:  $AgentDir" -ForegroundColor Gray
+Write-Host "Scripts location: $ScriptsDir" -ForegroundColor Gray
+Write-Host "Schema location:  $SchemaDir" -ForegroundColor Gray
+Write-Host "PDF location:     $PdfDir" -ForegroundColor Gray
