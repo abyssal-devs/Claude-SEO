@@ -7,11 +7,13 @@ credentials*.json
 # Histórico de conversas e sessões (dados privados)
 projects/
 sessions/
+session-env/
 file-history/
 
 # Arquivos temporários e internos
 shell-snapshots/
 backups/
+telemetry/
 ide/
 .last-cleanup
 
@@ -23,6 +25,9 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Arquivos de sistema
+# Arquivos de sistema / editor
 .DS_Store
 Thumbs.db
+*.swp
+.idea/
+.vscode/
