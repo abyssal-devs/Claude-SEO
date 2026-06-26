@@ -1,0 +1,28 @@
+# Credentials e tokens de autenticação
+.credentials.json
+*.token
+*.key
+credentials*.json
+
+# Histórico de conversas e sessões (dados privados)
+projects/
+sessions/
+file-history/
+
+# Arquivos temporários e internos
+shell-snapshots/
+backups/
+ide/
+.last-cleanup
+
+# Downloads incompletos
+*.crdownload
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db

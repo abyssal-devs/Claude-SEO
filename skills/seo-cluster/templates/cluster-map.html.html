@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJETO}} — Mapa de Cluster</title>
+<style>
+  :root { --controls-height: 66px; --top-bars-height: 105px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; overflow-x: hidden; padding-bottom: var(--controls-height); }
+
+  /* Header */
+  .header { background: #1a1d2e; border-bottom: 1px solid #2d3748; padding: 20px 32px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .header-logo { background: #3b82f6; color: white; font-weight: 800; font-size: 18px; padding: 6px 14px; border-radius: 8px; letter-spacing: -0.5px; }
+  .header-title { font-size: 20px; font-weight: 600; color: #f8fafc; }
+  .header-sub { font-size: 13px; color: #64748b; margin-left: auto; }
+
+  /* Stats bar */
+  .stats-bar { background: #1a1d2e; border-bottom: 1px solid #2d3748; padding: 12px 32px; display: flex; gap: 28px; overflow-x: auto; scrollbar-width: thin; }
+  .stat { text-align: center; min-width: 86px; flex: 0 0 auto; }
+  .stat-num { font-size: 24px; font-weight: 700; color: #f8fafc; }
+  .stat-lbl { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+  /* Layout */
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 0; height: calc(100vh - var(--top-bars-height) - var(--controls-height)); min-height: 500px; }
+
+  /* Canvas */
+  .canvas-wrap { position: relative; overflow: auto; background: #0f1117; min-height: 0; scrollbar-width: thin; scrollbar-color: #3d4663 #0f1117; }
+  .canvas-wrap::-webkit-scrollbar, .stats-bar::-webkit-scrollbar, .sidebar::-webkit-scrollbar, .table-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+  .canvas-wrap::-webkit-scrollbar-track, .stats-bar::-webkit-scrollbar-track, .sidebar::-webkit-scrollbar-track, .table-wrap::-webkit-scrollbar-track { background: #0f1117; }
+  .canvas-wrap::-webkit-scrollbar-thumb, .stats-bar::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb, .table-wrap::-webkit-scrollbar-thumb { background: #3d4663; border-radius: 8px; border: 2px solid #0f1117; }
+  #canvas { width: 100%; height: 100%; display: block; min-width: 100%; min-height: 100%; }
+
+  /* Tooltip */
+  .tooltip { position: absolute; background: #1e2235; border: 1px solid #3d4663; border-radius: 10px; padding: 14px 16px; max-width: 280px; pointer-events: none; opacity: 0; transition: opacity 0.15s; font-size: 13px; line-height: 1.5; z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  .tooltip.visible { opacity: 1; }
+  .tt-title { font-weight: 700; font-size: 14px; color: #f8fafc; margin-bottom: 6px; }
+  .tt-kw { color: #94a3b8; font-size: 12px; margin-bottom: 4px; }
+  .tt-kw span { color: #7dd3fc; }
+  .tt-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .tt-chip { background: #2d3748; border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #94a3b8; }
+  .tt-chip.published { background: #064e3b; color: #6ee7b7; }
+  .tt-chip.bofu { background: #1e3a5f; color: #93c5fd; }
+  .tt-chip.tofU { background: #3d1a5c; color: #c4b5fd; }
+
+  /* Sidebar */
+  .sidebar { background: #13161f; border-left: 1px solid #2d3748; overflow-y: auto; min-width: 0; }
+  .sidebar-section { padding: 20px 20px 0; }
+  .sidebar-section h3 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; margin-bottom: 12px; }
+
+  /* Legend */
+  .legend { display: flex; flex-direction: column; gap: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-pill { display: inline-block; width: 24px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+  /* Phase roadmap */
+  .phases { display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px; }
+  .phase { background: #1a1d2e; border-radius: 8px; padding: 12px 14px; border-left: 3px solid transparent; }
+  .phase.p1 { border-color: #ef4444; }
+  .phase.p2 { border-color: #f97316; }
+  .phase.p3 { border-color: #eab308; }
+  .phase.p4 { border-color: #22c55e; }
+  .phase.p5 { border-color: #64748b; }
+  .phase-label { font-weight: 700; font-size: 13px; color: #f8fafc; margin-bottom: 4px; }
+  .phase-count { font-size: 12px; color: #64748b; }
+  .phase-badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 12px; margin-left: 6px; font-weight: 600; }
+  .badge-red { background: #450a0a; color: #fca5a5; }
+  .badge-orange { background: #431407; color: #fdba74; }
+  .badge-yellow { background: #422006; color: #fde047; }
+  .badge-green { background: #052e16; color: #86efac; }
+  .badge-gray { background: #1e293b; color: #94a3b8; }
+
+  /* Quick wins */
+  .qw-list { display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px; }
+  .qw-item { background: #1a1d2e; border-radius: 8px; padding: 10px 12px; border-left: 3px solid #f59e0b; }
+  .qw-url { font-size: 11px; color: #7dd3fc; font-family: monospace; margin-bottom: 4px; }
+  .qw-action { font-size: 12px; color: #94a3b8; }
+  .qw-priority { font-size: 10px; font-weight: 700; color: #f59e0b; text-transform: uppercase; }
+
+  /* Table */
+  .table-wrap { padding: 0 20px 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; text-align: left; padding: 8px 6px; border-bottom: 1px solid #2d3748; position: sticky; top: 0; background: #13161f; }
+  td { padding: 8px 6px; border-bottom: 1px solid #1e2235; color: #94a3b8; vertical-align: top; }
+  tr:hover td { background: #1a1d2e; }
+  .td-id { font-family: monospace; font-size: 11px; color: #4f6080; }
+  .td-title { color: #cbd5e1; max-width: 180px; }
+  .td-status-pub { color: #6ee7b7; font-weight: 600; }
+  .td-status-new { color: #64748b; }
+  .td-cluster { border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; }
+  .cl1 { background: #1e3a5f; color: #93c5fd; }
+  .cl2 { background: #064e3b; color: #6ee7b7; }
+  .cl3 { background: #431407; color: #fdba74; }
+  .cl4 { background: #3d1a5c; color: #c4b5fd; }
+  .clp { background: #2d3748; color: #f8fafc; }
+
+  /* Controls */
+  .controls { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 12px 20px; max-width: none; background: rgba(19,22,31,0.96); border-top: 1px solid #2d3748; z-index: 1000; backdrop-filter: blur(10px); }
+  .ctrl-btn { background: #1a1d2e; border: 1px solid #2d3748; color: #94a3b8; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.15s; }
+  .ctrl-btn:hover { background: #2d3748; color: #f8fafc; }
+  .ctrl-btn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+
+  /* Filter buttons */
+  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .filter-btn { background: #1a1d2e; border: 1px solid #2d3748; color: #94a3b8; padding: 4px 10px; border-radius: 20px; cursor: pointer; font-size: 11px; transition: all 0.15s; }
+  .filter-btn:hover { border-color: #3b82f6; color: #93c5fd; }
+  .filter-btn.active { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+  .divider { height: 1px; background: #2d3748; margin: 16px 0; }
+
+  @media (max-width: 980px) {
+    .main { grid-template-columns: 1fr; height: auto; min-height: 0; }
+    .canvas-wrap { height: clamp(420px, calc(100vh - 170px - var(--controls-height)), 620px); border-bottom: 1px solid #2d3748; }
+    .sidebar { border-left: 0; overflow: visible; }
+  }
+
+  @media (max-width: 640px) {
+    :root { --controls-height: 146px; }
+    .header { padding: 16px; gap: 10px 12px; align-items: flex-start; }
+    .header-logo { font-size: 16px; }
+    .header-title { font-size: 18px; }
+    .header-sub { flex-basis: 100%; margin-left: 0; line-height: 1.4; }
+    .stats-bar { padding: 10px 16px; gap: 12px; }
+    .stat { min-width: 78px; }
+    .stat-num { font-size: 20px; }
+    .stat-lbl { font-size: 10px; }
+    .canvas-wrap { height: clamp(340px, calc(100vh - 170px - var(--controls-height)), 520px); }
+    .tooltip { max-width: min(280px, calc(100vw - 32px)); }
+    .controls { left: 0; right: 0; bottom: 0; max-width: none; gap: 6px; padding: 10px 12px; }
+    .ctrl-btn { flex: 1 1 calc(50% - 6px); padding: 8px 10px; }
+    .sidebar-section { padding: 16px 16px 0; }
+    .table-wrap { padding: 0 16px 16px; overflow-x: auto; }
+    table { min-width: 420px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">{{PROJETO}}</div>
+  <div class="header-title">Mapa de Cluster</div>
+  <div class="header-sub">Gerado em {{DATA}} · {{TOTAL_CLUSTERS}} clusters · {{TOTAL_PAGES}} páginas planejadas</div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-num">{{PILLAR_PAGES}}</div><div class="stat-lbl">Pillar Page</div></div>
+  <div class="stat"><div class="stat-num">{{TOTAL_CLUSTERS}}</div><div class="stat-lbl">Clusters</div></div>
+  <div class="stat"><div class="stat-num">{{TOTAL_TOPICOS}}</div><div class="stat-lbl">Tópicos</div></div>
+  <div class="stat"><div class="stat-num">{{TOTAL_LPS}}</div><div class="stat-lbl">LPs</div></div>
+  <div class="stat"><div class="stat-num">{{TOTAL_PUBLICADOS}}</div><div class="stat-lbl">Publicados</div></div>
+  <div class="stat"><div class="stat-num">{{TOTAL_LINKS}}</div><div class="stat-lbl">Links internos</div></div>
+  <div class="stat"><div class="stat-num">{{TOTAL_WORDS}}</div><div class="stat-lbl">Palavras estimadas</div></div>
+</div>
+
+<div class="main">
+  <div class="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+    <div class="controls">
+      <button class="ctrl-btn active" id="btn-all" onclick="setFilter('all')">Todos</button>
+      <button class="ctrl-btn" id="btn-c1" onclick="setFilter('C1')">Cluster A</button>
+      <button class="ctrl-btn" id="btn-c2" onclick="setFilter('C2')">Cluster B</button>
+      <button class="ctrl-btn" id="btn-c3" onclick="setFilter('C3')">Cluster C</button>
+      <button class="ctrl-btn" id="btn-c4" onclick="setFilter('C4')">Cluster D</button>
+      <button class="ctrl-btn" id="btn-pub" onclick="setFilter('published')">Publicados</button>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <h3>Legenda</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#f8fafc;border:2px solid #64748b;width:16px;height:16px;"></div> Pillar Page</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;width:14px;height:14px;"></div> Cluster A</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#10b981;width:14px;height:14px;"></div> Cluster B</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;width:14px;height:14px;"></div> Cluster C</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6;width:14px;height:14px;"></div> Cluster D</div>
+        <div class="legend-item"><div style="width:14px;height:14px;border-radius:50%;border:2px dashed #64748b;background:transparent;"></div> Landing Page</div>
+        <div class="legend-item"><div style="width:14px;height:14px;border-radius:50%;border:2px solid #22c55e;background:#052e16;"></div> Publicado</div>
+      </div>
+      <div class="divider"></div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-pill" style="background:#f8fafc;height:2px;"></div> Link obrigatório</div>
+        <div class="legend-item"><div class="legend-pill" style="background:#3b82f6;height:1px;"></div> Link recomendado</div>
+        <div class="legend-item"><div class="legend-pill" style="background:#4f6080;height:1px;border-top:1px dashed #4f6080;"></div> Link opcional</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:16px;">
+      <h3>Roadmap</h3>
+      <div class="phases">
+        <div class="phase p1">
+          <div class="phase-label">Fase 1 — LPs <span class="phase-badge badge-red">Prioridade</span></div>
+          <div class="phase-count">{{FASE1_QUANTIDADE}} páginas · {{FASE1_DURACAO}}</div>
+          <div style="margin-top:6px;font-size:11px;color:#94a3b8;">{{FASE1_DETALHES}}</div>
+        </div>
+        <div class="phase p2">
+          <div class="phase-label">Fase 2 — Quick Wins <span class="phase-badge badge-orange">Alto</span></div>
+          <div class="phase-count">{{FASE2_QUANTIDADE}} itens · {{FASE2_DURACAO}}</div>
+          <div style="margin-top:6px;font-size:11px;color:#94a3b8;">{{FASE2_DETALHES}}</div>
+        </div>
+        <div class="phase p3">
+          <div class="phase-label">Fase 3 — Pilar <span class="phase-badge badge-yellow">Médio</span></div>
+          <div class="phase-count">{{FASE3_QUANTIDADE}} itens · {{FASE3_DURACAO}}</div>
+          <div style="margin-top:6px;font-size:11px;color:#94a3b8;">{{FASE3_DETALHES}}</div>
+        </div>
+        <div class="phase p4">
+          <div class="phase-label">Fase 4 — Volume <span class="phase-badge badge-green">Normal</span></div>
+          <div class="phase-count">{{FASE4_QUANTIDADE}} itens · {{FASE4_DURACAO}}</div>
+          <div style="margin-top:6px;font-size:11px;color:#94a3b8;">{{FASE4_DETALHES}}</div>
+        </div>
+        <div class="phase p5">
+          <div class="phase-label">Fase 5 — Backlog <span class="phase-badge badge-gray">Baixa</span></div>
+          <div class="phase-count">{{FASE5_QUANTIDADE}} itens · {{FASE5_DURACAO}}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Quick Wins</h3>
+      <div class="qw-list">
+        <div class="qw-item">
+          <div class="qw-priority">Alta prioridade</div>
+          <div class="qw-url">{{URL_QUICKWIN_1}}</div>
+          <div class="qw-action">{{ACAO_QUICKWIN_1}}</div>
+        </div>
+        <div class="qw-item">
+          <div class="qw-priority">Alta prioridade</div>
+          <div class="qw-url">{{URL_QUICKWIN_2}}</div>
+          <div class="qw-action">{{ACAO_QUICKWIN_2}}</div>
+        </div>
+        <div class="qw-item">
+          <div class="qw-priority">Média prioridade</div>
+          <div class="qw-url">{{URL_QUICKWIN_3}}</div>
+          <div class="qw-action">{{ACAO_QUICKWIN_3}}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Tabela de Conteúdo</h3>
+    </div>
+    <div class="table-wrap">
+      <table id="posts-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Título</th>
+            <th>Cluster</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLUSTER_DATA = {
+  pillar: {
+    id: "P0",
+    title: "Pilar do Projeto",
+    keyword: "{{KEYWORD_PILAR}}",
+    template: "Guia",
+    wordCount: 2500,
+    url: "/pilar",
+    status: "Planejado",
+    funnel: "ToFu→BoFu"
+  },
+  clusters: [
+    {
+      id: "C1",
+      name: "Cluster A",
+      fullName: "Cluster A — Tema Principal",
+      color: "#3b82f6",
+      colorDim: "rgba(59,130,246,0.15)",
+      posts: [
+        { id:"C1-T1", title:"Tópico A 1", keyword:"{{KEYWORD_A1}}", template:"Explainer", wordCount:1200, url:"/cluster-a-topico-1", status:"Planejado", funnel:"ToFu" },
+        { id:"C1-LP1", title:"LP Cluster A", keyword:"{{KEYWORD_LP_A}}", template:"Landing Page", wordCount:900, url:"/lp-cluster-a", status:"Planejado", funnel:"BoFu", isLP:true }
+      ]
+    },
+    {
+      id: "C2",
+      name: "Cluster B",
+      fullName: "Cluster B — Tema Secundário",
+      color: "#10b981",
+      colorDim: "rgba(16,185,129,0.15)",
+      posts: [
+        { id:"C2-T1", title:"Tópico B 1", keyword:"{{KEYWORD_B1}}", template:"How-to", wordCount:1200, url:"/cluster-b-topico-1", status:"Planejado", funnel:"ToFu" },
+        { id:"C2-LP1", title:"LP Cluster B", keyword:"{{KEYWORD_LP_B}}", template:"Landing Page", wordCount:900, url:"/lp-cluster-b", status:"Publicado", funnel:"BoFu", isLP:true }
+      ]
+    },
+    {
+      id: "C3",
+      name: "Cluster C",
+      fullName: "Cluster C — Tema Adicional",
+      color: "#f59e0b",
+      colorDim: "rgba(245,158,11,0.15)",
+      posts: [
+        { id:"C3-T1", title:"Tópico C 1", keyword:"{{KEYWORD_C1}}", template:"Definition", wordCount:1200, url:"/cluster-c-topico-1", status:"Planejado", funnel:"ToFu" },
+        { id:"C3-LP1", title:"LP Cluster C", keyword:"{{KEYWORD_LP_C}}", template:"Landing Page", wordCount:900, url:"/lp-cluster-c", status:"Planejado", funnel:"BoFu", isLP:true }
+      ]
+    },
+    {
+      id: "C4",
+      name: "Cluster D",
+      fullName: "Cluster D — Tema Extra",
+      color: "#8b5cf6",
+      colorDim: "rgba(139,92,246,0.15)",
+      posts: [
+        { id:"C4-T1", title:"Tópico D 1", keyword:"{{KEYWORD_D1}}", template:"Strategy", wordCount:1200, url:"/cluster-d-topico-1", status:"Planejado", funnel:"ToFu" },
+        { id:"C4-LP1", title:"LP Cluster D", keyword:"{{KEYWORD_LP_D}}", template:"Landing Page", wordCount:900, url:"/lp-cluster-d", status:"Planejado", funnel:"BoFu", isLP:true }
+      ]
+    }
+  ],
+  meta: {
+    totalPosts: 9,
+    totalClusters: 4,
+    totalLinks: 0,
+    estimatedWords: 15000,
+    published: 0,
+    toCreate: 9
+  }
+};
+
+// ── Canvas rendering ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+let nodes = [];
+let links = [];
+let currentFilter = 'all';
+let hoveredNode = null;
+let dpr = window.devicePixelRatio || 1;
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function totalPostCount() {
+  return CLUSTER_DATA.clusters.reduce((sum, cl) => sum + cl.posts.length, 1);
+}
+
+function maxPostsPerCluster() {
+  return CLUSTER_DATA.clusters.reduce((max, cl) => Math.max(max, cl.posts.length), 0);
+}
+
+function getCanvasContentSize(wrap) {
+  const visibleWidth = wrap.clientWidth || window.innerWidth;
+  const visibleHeight = wrap.clientHeight || Math.max(520, window.innerHeight - wrap.getBoundingClientRect().top);
+  const mobile = visibleWidth <= 640;
+  const contentCount = totalPostCount();
+  const densestCluster = maxPostsPerCluster();
+  const extraClusters = Math.max(CLUSTER_DATA.clusters.length - 4, 0);
+  const densityWidth = contentCount * (mobile ? 12 : 8);
+  const densityHeight = contentCount * (mobile ? 20 : 14);
+  const ringWidth = densestCluster * (mobile ? 34 : 26);
+  const ringHeight = densestCluster * (mobile ? 34 : 28);
+
+  return {
+    width: Math.min(Math.max(visibleWidth, visibleWidth + densityWidth, visibleWidth + ringWidth), mobile ? 2200 : 2600),
+    height: Math.min(Math.max(visibleHeight, visibleHeight + densityHeight, visibleHeight + ringHeight, visibleHeight + extraClusters * 90), mobile ? 2600 : 2400)
+  };
+}
+
+function resize() {
+  const wrap = canvas.parentElement;
+  dpr = window.devicePixelRatio || 1;
+  const contentSize = getCanvasContentSize(wrap);
+  canvas.width = contentSize.width * dpr;
+  canvas.height = contentSize.height * dpr;
+  canvas.style.width = contentSize.width + 'px';
+  canvas.style.height = contentSize.height + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  buildLayout();
+  draw();
+}
+
+function buildLayout() {
+  nodes = [];
+  links = [];
+  const W = canvas.clientWidth;
+  const H = canvas.clientHeight;
+  const shortSide = Math.min(W, H);
+  const cx = W / 2;
+  const cy = H / 2;
+  const mobile = W <= 640;
+  const clusterCount = Math.max(CLUSTER_DATA.clusters.length, 1);
+  const layoutPad = mobile ? 30 : 56;
+
+  // Pillar node
+  nodes.push({ id: 'P0', x: cx, y: cy, r: mobile ? 26 : 32, color: '#f8fafc', textColor: '#0f1117', label: 'Pillar\nProjeto', data: CLUSTER_DATA.pillar, type: 'pillar' });
+
+  // Cluster hubs
+  const clusterAngles = clusterCount === 4
+    ? [-Math.PI/2, 0, Math.PI/2, Math.PI]
+    : CLUSTER_DATA.clusters.map((_, ci) => -Math.PI / 2 + (Math.PI * 2 * ci) / clusterCount);
+  const clusterR = clamp(shortSide * (mobile ? 0.2 : 0.24), mobile ? 82 : 120, mobile ? 180 : 260);
+  const baseSpokeR = clamp(shortSide * (mobile ? 0.12 : 0.13), mobile ? 52 : 68, mobile ? 96 : 130);
+  const ringGap = mobile ? 50 : 64;
+  const nodeGap = mobile ? 22 : 28;
+
+  CLUSTER_DATA.clusters.forEach((cl, ci) => {
+    const angle = clusterAngles[ci];
+    const hx = cx + Math.cos(angle) * clusterR;
+    const hy = cy + Math.sin(angle) * clusterR;
+    const hubNode = { id: cl.id + '-hub', x: hx, y: hy, r: mobile ? 18 : 22, color: cl.color, textColor: '#fff', label: cl.name, data: { title: cl.fullName, keyword: cl.id, status: 'hub', funnel: 'Hub' }, type: 'hub', cluster: cl.id };
+    nodes.push(hubNode);
+    links.push({ from: 'P0', to: cl.id + '-hub', type: 'M', color: 'rgba(255,255,255,0.3)', width: 2 });
+
+    // Posts are arranged in outward rings so dense clusters can grow without being cut.
+    const spokeCount = cl.posts.length;
+    let placed = 0;
+    let ring = 0;
+
+    while (placed < spokeCount) {
+      const spokeR = baseSpokeR + ring * ringGap;
+      const arcSpan = Math.min(Math.PI * 1.28, Math.PI * 0.72 + ring * 0.22);
+      const capacity = Math.max(1, Math.floor((spokeR * arcSpan) / nodeGap));
+      const ringCount = Math.min(spokeCount - placed, capacity);
+      const startAngle = angle - arcSpan / 2;
+
+      for (let ri = 0; ri < ringCount; ri++) {
+        const post = cl.posts[placed + ri];
+        const pAngle = ringCount === 1 ? angle : startAngle + (arcSpan / (ringCount - 1)) * ri;
+        const px = hx + Math.cos(pAngle) * spokeR;
+        const py = hy + Math.sin(pAngle) * spokeR;
+        const isPublished = post.status === 'Publicado';
+        const isLP = post.isLP;
+        const r = isLP ? (mobile ? 7 : 8) : (isPublished ? (mobile ? 10 : 12) : (mobile ? 8 : 9));
+        nodes.push({
+          id: post.id, x: px, y: py, r: r,
+          color: isPublished ? cl.color : (isLP ? 'transparent' : cl.color + '55'),
+          borderColor: isPublished ? '#22c55e' : (isLP ? cl.color : cl.color),
+          borderWidth: isPublished ? 2 : (isLP ? 1.5 : 1),
+          borderDash: isLP ? [4, 3] : [],
+          textColor: '#fff',
+          label: post.id,
+          data: post,
+          type: isLP ? 'lp' : 'post',
+          cluster: cl.id,
+          published: isPublished
+        });
+        links.push({ from: cl.id + '-hub', to: post.id, type: 'R', color: cl.color + '50', width: 1 });
+      }
+
+      placed += ringCount;
+      ring++;
+    }
+  });
+
+  fitLayoutToCanvas(W, H, layoutPad);
+}
+
+function fitLayoutToCanvas(W, H, pad) {
+  if (!nodes.length) return;
+  const bounds = nodes.reduce((acc, node) => {
+    acc.minX = Math.min(acc.minX, node.x - node.r);
+    acc.maxX = Math.max(acc.maxX, node.x + node.r);
+    acc.minY = Math.min(acc.minY, node.y - node.r);
+    acc.maxY = Math.max(acc.maxY, node.y + node.r);
+    return acc;
+  }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+
+  const boundsW = Math.max(bounds.maxX - bounds.minX, 1);
+  const boundsH = Math.max(bounds.maxY - bounds.minY, 1);
+  const scale = Math.min(1, (W - pad * 2) / boundsW, (H - pad * 2) / boundsH);
+  const centerX = bounds.minX + boundsW / 2;
+  const centerY = bounds.minY + boundsH / 2;
+
+  nodes.forEach(node => {
+    node.x = (node.x - centerX) * scale + W / 2;
+    node.y = (node.y - centerY) * scale + H / 2;
+    node.r = Math.max(node.type === 'pillar' ? 18 : node.type === 'hub' ? 14 : 5, node.r * scale);
+  });
+}
+
+function draw() {
+  const W = canvas.clientWidth;
+  const H = canvas.clientHeight;
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw links first
+  links.forEach(link => {
+    const from = nodes.find(n => n.id === link.from);
+    const to = nodes.find(n => n.id === link.to);
+    if (!from || !to) return;
+    if (!isVisible(from) && !isVisible(to)) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.strokeStyle = link.color;
+    ctx.lineWidth = link.width;
+    if (link.type === 'O') ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  });
+
+  // Draw nodes
+  nodes.forEach(node => {
+    if (!isVisible(node)) {
+      ctx.save();
+      ctx.globalAlpha = 0.08;
+      drawNode(node);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    } else {
+      drawNode(node);
+    }
+  });
+}
+
+function isVisible(node) {
+  if (currentFilter === 'all') return true;
+  if (currentFilter === 'published') return node.published || node.type === 'pillar' || node.type === 'hub';
+  return node.cluster === currentFilter || node.type === 'pillar' || node.type === 'hub';
+}
+
+function drawNode(node) {
+  ctx.save();
+  if (node === hoveredNode) {
+    ctx.shadowColor = node.color === 'transparent' ? node.borderColor : node.color;
+    ctx.shadowBlur = 16;
+  }
+  ctx.beginPath();
+  ctx.arc(node.x, node.y, node.r, 0, Math.PI * 2);
+
+  if (node.type === 'pillar') {
+    const grad = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, node.r);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, '#94a3b8');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = node.color;
+    ctx.fill();
+    if (node.borderColor) {
+      ctx.strokeStyle = node.borderColor;
+      ctx.lineWidth = node.borderWidth || 1;
+      if (node.borderDash && node.borderDash.length) ctx.setLineDash(node.borderDash);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Label for hub / pillar
+  if (node.type === 'hub' || node.type === 'pillar') {
+    ctx.fillStyle = node.textColor;
+    ctx.font = node.type === 'pillar' ? 'bold 9px Segoe UI' : 'bold 9px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const lines = node.label.split('\n');
+    const lh = 11;
+    lines.forEach((line, i) => {
+      ctx.fillText(line, node.x, node.y + (i - (lines.length - 1) / 2) * lh);
+    });
+  }
+
+  ctx.restore();
+}
+
+// Hover detection
+function getNodeAt(mx, my) {
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    const dx = mx - n.x, dy = my - n.y;
+    if (dx * dx + dy * dy <= (n.r + 4) * (n.r + 4)) return n;
+  }
+  return null;
+}
+
+function positionTooltip(mx, my) {
+  const wrap = canvas.parentElement;
+  const gap = 14;
+  const tooltipWidth = tooltip.offsetWidth || 280;
+  const tooltipHeight = tooltip.offsetHeight || 160;
+  const visibleLeft = wrap.scrollLeft;
+  const visibleTop = wrap.scrollTop;
+  const visibleRight = visibleLeft + wrap.clientWidth;
+  const visibleBottom = visibleTop + wrap.clientHeight;
+
+  let tx = mx + gap;
+  let ty = my + gap;
+
+  if (tx + tooltipWidth > visibleRight - gap) tx = mx - tooltipWidth - gap;
+  if (ty + tooltipHeight > visibleBottom - gap) ty = my - tooltipHeight - gap;
+
+  tooltip.style.left = Math.max(visibleLeft + gap, tx) + 'px';
+  tooltip.style.top = Math.max(visibleTop + gap, ty) + 'px';
+}
+
+function showNodeTooltip(node, mx, my) {
+  if (node && node.data) {
+    const d = node.data;
+    const funnelClass = d.funnel === 'ToFu' ? 'tofU' : (d.funnel === 'BoFu' || node.type === 'lp' ? 'bofu' : '');
+    tooltip.innerHTML = `
+      <div class="tt-title">${d.title || node.label}</div>
+      ${d.keyword ? `<div class="tt-kw">Keyword: <span>${d.keyword}</span></div>` : ''}
+      ${d.url ? `<div class="tt-kw">URL: <span>${d.url}</span></div>` : ''}
+      ${d.wordCount ? `<div class="tt-kw">Palavras: <span>${d.wordCount}</span></div>` : ''}
+      <div class="tt-meta">
+        ${d.status ? `<span class="tt-chip ${d.status === 'Publicado' ? 'published' : ''}">${d.status}</span>` : ''}
+        ${d.funnel ? `<span class="tt-chip ${funnelClass}">${d.funnel}</span>` : ''}
+        ${d.template ? `<span class="tt-chip">${d.template}</span>` : ''}
+      </div>`;
+    tooltip.classList.add('visible');
+    positionTooltip(mx, my);
+    canvas.style.cursor = 'pointer';
+  } else {
+    tooltip.classList.remove('visible');
+    canvas.style.cursor = 'default';
+  }
+}
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const node = getNodeAt(mx, my);
+  hoveredNode = node;
+  showNodeTooltip(node, mx, my);
+  draw();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredNode = null;
+  tooltip.classList.remove('visible');
+  draw();
+});
+
+function handleTouch(e) {
+  if (!e.touches.length) return;
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  const mx = touch.clientX - rect.left;
+  const my = touch.clientY - rect.top;
+  const node = getNodeAt(mx, my);
+  hoveredNode = node;
+  showNodeTooltip(node, mx, my);
+  draw();
+}
+
+canvas.addEventListener('touchstart', handleTouch, { passive: true });
+canvas.addEventListener('touchmove', handleTouch, { passive: true });
+document.addEventListener('touchstart', e => {
+  if (canvas.parentElement.contains(e.target)) return;
+  hoveredNode = null;
+  tooltip.classList.remove('visible');
+  draw();
+});
+
+// Filter
+function setFilter(f) {
+  const filterMap = { 'Cluster 1': 'C1', 'Cluster 2': 'C2', 'Cluster 3': 'C3', 'Cluster 4': 'C4' };
+  currentFilter = filterMap[f] || f;
+  document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+  const btnId = currentFilter === 'all' ? 'btn-all' : currentFilter === 'published' ? 'btn-pub' : 'btn-' + currentFilter.toLowerCase();
+  const activeBtn = document.getElementById(btnId);
+  if (activeBtn) activeBtn.classList.add('active');
+  draw();
+}
+
+// ── Table ──────────────────────────────────────────────────────────────────
+function buildTable() {
+  const tbody = document.getElementById('table-body');
+  const allPosts = [
+    { id:'P0', title:'Pilar do Projeto', cluster:'Pillar', status:'Planejado' }
+  ];
+  CLUSTER_DATA.clusters.forEach(cl => {
+    cl.posts.forEach(p => {
+      allPosts.push({ id: p.id, title: p.title, cluster: cl.id, status: p.status });
+    });
+  });
+
+  const clMap = { C1:'cl1', C2:'cl2', C3:'cl3', C4:'cl4', Pillar:'clp' };
+  tbody.innerHTML = allPosts.map(p => `
+    <tr>
+      <td class="td-id">${p.id}</td>
+      <td class="td-title">${p.title}</td>
+      <td><span class="td-cluster ${clMap[p.cluster] || ''}">${p.cluster}</span></td>
+      <td class="${p.status === 'Publicado' ? 'td-status-pub' : 'td-status-new'}">${p.status}</td>
+    </tr>`).join('');
+}
+
+buildTable();
+resize();
+window.addEventListener('resize', () => { ctx.setTransform(1,0,0,1,0,0); resize(); });
+</script>
+</body>
+</html>
